@@ -208,6 +208,63 @@
 
         }
 
+
+        #stageChoice {
+
+            display: none;
+
+            position: fixed;
+
+            inset: 0;
+
+            align-items: center;
+
+            justify-content: center;
+
+            background: rgba(2, 0, 8, .72);
+
+            z-index: 20;
+
+        }
+
+
+        #stageChoicePanel {
+
+            padding: 24px;
+
+            min-width: 280px;
+
+            text-align: center;
+
+            background: rgba(5, 0, 20, .96);
+
+            border: 1px solid #00ffff;
+
+            box-shadow: 0 0 24px #00ffff;
+
+            color: #ffffff;
+
+        }
+
+
+        #stageChoice button {
+
+            margin-top: 18px;
+
+            padding: 10px 18px;
+
+            background: #ff00ff;
+
+            border: 1px solid #ffffff;
+
+            color: #ffffff;
+
+            font: bold 14px "Courier New", monospace;
+
+            cursor: pointer;
+
+        }
+
     </style>
 
 </head>
@@ -275,6 +332,26 @@
 
     <div class="stat">
 
+        STAGE:
+
+        <span id="stage">
+            01 / 03
+        </span>
+
+    </div>
+
+    <div class="stat">
+
+        OBJECTIVE:
+
+        <span id="objective">
+            REACH THE EXIT
+        </span>
+
+    </div>
+
+    <div class="stat">
+
         GROUNDED:
 
         <span id="grounded">
@@ -317,6 +394,14 @@
 
     W / ↑ / SPACE &nbsp; JUMP
 
+    <br>
+
+    K &nbsp; SHOOT
+
+    <br>
+
+    E &nbsp; SANDEVISTAN
+
     <br><br>
 
     🟦 SOLID BLOCK
@@ -324,6 +409,21 @@
     <br>
 
     🟪 PLATFORM
+
+</div>
+
+
+<div id="stageChoice">
+
+    <div id="stageChoicePanel">
+
+        <div>STAGE 01 COMPLETE</div>
+
+        <div>SELECT NEXT STAGE</div>
+
+        <button id="stageTwoButton">ENTER STAGE 02</button>
+
+    </div>
 
 </div>
 
@@ -344,6 +444,41 @@ const canvas =
 
 const ctx =
     canvas.getContext("2d");
+
+
+ctx.imageSmoothingEnabled =
+    false;
+
+
+const playerSprite =
+    new Image();
+
+
+playerSprite.src =
+    "idle/idle_01.png";
+
+
+const spriteSheet = {
+
+    columns: 20,
+
+    frameHeight: 100,
+
+    rows: 9,
+
+    idleRow: 0,
+
+    walkRow: 1,
+
+    jumpRow: 6,
+
+    idleSpeed: 120,
+
+    walkSpeed: 70,
+
+    jumpSpeed: 80
+
+};
 
 
 function resizeCanvas() {
@@ -378,6 +513,16 @@ window.addEventListener(
     function(event) {
 
         keys[event.key] = true;
+
+
+        if (
+            event.key === "k" ||
+            event.key === "K"
+        ) {
+
+            fireWeapon();
+
+        }
 
 
         if (
@@ -421,6 +566,8 @@ const world = {
 
     height: 2000,
 
+    groundY: 650,
+
     gravity: 0.7
 
 };
@@ -459,6 +606,55 @@ const player = {
     level: 1
 
 };
+
+
+const game = {
+
+    stage: 1,
+
+    maxStage: 3,
+
+    hasGun: false,
+
+    hasSandevistan: false,
+
+    slowTime: 0,
+
+    message: "REACH THE EXIT",
+
+    messageUntil: 0,
+
+    finishX: 4750,
+
+    stageComplete: false,
+
+    victory: false
+
+};
+
+
+const enemies = [];
+
+const bullets = [];
+
+const pickups = [];
+
+const stageChoice = document.getElementById("stageChoice");
+
+const stageTwoButton = document.getElementById("stageTwoButton");
+
+let enemyHitCooldown = 0;
+
+let weaponCooldown = 0;
+
+
+stageTwoButton.addEventListener("click", function() {
+
+    stageChoice.style.display = "none";
+
+    setupStage(2);
+
+});
 
 
 /* =================================================
@@ -607,6 +803,338 @@ const map = [
     }
 
 ];
+
+
+function addBlock(x, y, width, height, type) {
+
+    map.push({ x, y, width, height, type });
+
+}
+
+
+function addEnemy(x, y, type = "drone") {
+
+    enemies.push({
+
+        x,
+
+        y,
+
+        width: type === "boss" ? 64 : 42,
+
+        height: type === "boss" ? 76 : 52,
+
+        type,
+
+        hp: type === "boss" ? 12 : type === "miniBoss" ? 7 : 2,
+
+        maxHp: type === "boss" ? 12 : type === "miniBoss" ? 7 : 2,
+
+        speed: type === "boss" ? 1.1 : 1.5,
+
+        direction: -1,
+
+        attackCooldown: 0,
+
+        dead: false
+
+    });
+
+}
+
+
+function setupStage(stage) {
+
+    game.stage = stage;
+
+    enemies.length = 0;
+
+    bullets.length = 0;
+
+    pickups.length = 0;
+
+    map.length = 0;
+
+    addBlock(0, world.groundY, world.width, 200, "solid");
+
+    for (let x = 350; x < world.width - 400; x += 420) {
+
+        addBlock(
+            x,
+            world.groundY - (stage === 1 ? 0 : 30),
+            160,
+            stage === 3 ? 120 : 80,
+            "solid"
+        );
+
+        addBlock(x + 210, 500 - (stage * 15), 190, 28, "platform");
+
+    }
+
+    if (stage === 1) {
+
+        addEnemy(850, 598);
+
+        addEnemy(1450, 598);
+
+        addEnemy(2250, 598);
+
+        addEnemy(3300, 598);
+
+        addEnemy(3900, 598);
+
+        pickups.push({ x: 540, y: 605, type: "gun", collected: false });
+
+        game.message = "REACH THE EXIT // FIND THE PISTOL";
+
+    } else if (stage === 2) {
+
+        addEnemy(900, 598);
+
+        addEnemy(1750, 598);
+
+        addEnemy(2800, 598);
+
+        addEnemy(3500, 598);
+
+        addEnemy(4300, 574, "miniBoss");
+
+        pickups.push({ x: 3950, y: 605, type: "sandevistan", collected: false });
+
+        game.message = "FIND SANDEVISTAN // DEFEAT THE MINI-BOSS";
+
+    } else {
+
+        addEnemy(850, 598);
+
+        addEnemy(1800, 598);
+
+        addEnemy(3000, 598);
+
+        addEnemy(4300, 574, "boss");
+
+        game.message = "DEFEAT THE STAGE BOSS // REACH THE EXIT";
+
+    }
+
+    player.x = 260;
+
+    player.y = 300;
+
+    player.velocityX = 0;
+
+    player.velocityY = 0;
+
+    game.finishX = stage === 3 ? 4750 : 4650;
+
+    game.stageComplete = false;
+
+    game.messageUntil = performance.now() + 4000;
+
+}
+
+
+function showMessage(message) {
+
+    game.message = message;
+
+    game.messageUntil = performance.now() + 2600;
+
+}
+
+
+function fireWeapon() {
+
+    if (!game.hasGun || weaponCooldown > 0 || game.victory) {
+
+        return;
+
+    }
+
+    bullets.push({
+
+        x: player.x + (player.direction > 0 ? player.width : 0),
+
+        y: player.y + 25,
+
+        width: 14,
+
+        height: 4,
+
+        velocityX: player.direction * 14
+
+    });
+
+    weaponCooldown = 180;
+
+}
+
+
+function updateEnemies(delta) {
+
+    const timeScale = game.slowTime > 0 ? 0.35 : 1;
+
+    for (const enemy of enemies) {
+
+        if (enemy.dead) continue;
+
+        const nextX = enemy.x + enemy.direction * enemy.speed * delta / 16.67 * timeScale;
+
+        enemy.x = nextX;
+
+        for (const block of map) {
+
+            if (block.type !== "solid" || !isColliding(enemy, block)) continue;
+
+            if (enemy.direction > 0) {
+
+                enemy.x = block.x - enemy.width;
+
+            } else {
+
+                enemy.x = block.x + block.width;
+
+            }
+
+            enemy.direction *= -1;
+
+        }
+
+        if (enemy.x < 80 || enemy.x > world.width - 120) {
+
+            enemy.direction *= -1;
+
+        }
+
+        if (enemy.attackCooldown > 0) enemy.attackCooldown -= delta;
+
+        if (isColliding(player, enemy) && enemy.attackCooldown <= 0) {
+
+            player.hp = Math.max(0, player.hp - (enemy.type === "boss" ? 12 : 6));
+
+            enemy.attackCooldown = 900;
+
+        }
+
+    }
+
+}
+
+
+function updateGameplay(delta) {
+
+    weaponCooldown = Math.max(0, weaponCooldown - delta);
+
+    if (game.slowTime > 0) game.slowTime -= delta;
+
+    updateEnemies(delta);
+
+    for (let index = bullets.length - 1; index >= 0; index--) {
+
+        const bullet = bullets[index];
+
+        bullet.x += bullet.velocityX * delta / 16.67;
+
+        let hit = false;
+
+        for (const enemy of enemies) {
+
+            if (!enemy.dead && isColliding(bullet, enemy)) {
+
+                enemy.hp -= 1;
+
+                hit = true;
+
+                if (enemy.hp <= 0) {
+
+                    enemy.dead = true;
+
+                    if (!game.hasGun && !pickups.some(item => item.type === "gun")) {
+
+                        pickups.push({ x: enemy.x, y: enemy.y + enemy.height - 20, type: "gun", collected: false });
+
+                    }
+
+                }
+
+                break;
+
+            }
+
+        }
+
+        if (hit || bullet.x < -50 || bullet.x > world.width + 50) bullets.splice(index, 1);
+
+    }
+
+    for (const item of pickups) {
+
+        if (!item.collected && isColliding(player, { x: item.x, y: item.y, width: 34, height: 34 })) {
+
+            item.collected = true;
+
+            if (item.type === "gun") {
+
+                game.hasGun = true;
+
+                showMessage("PISTOL ACQUIRED // PRESS K TO FIRE");
+
+            } else {
+
+                game.hasSandevistan = true;
+
+                showMessage("SANDEVISTAN ONLINE // PRESS E TO SLOW TIME");
+
+            }
+
+        }
+
+    }
+
+    if ((keys["e"] || keys["E"]) && game.hasSandevistan && game.slowTime <= 0) {
+
+        game.slowTime = 5000;
+
+    }
+
+    const activeEnemies = enemies.filter(enemy => !enemy.dead);
+    const bossAlive = activeEnemies.some(enemy => enemy.type === "boss" || enemy.type === "miniBoss");
+
+    if (player.x >= game.finishX && !bossAlive && (game.stage !== 2 || game.hasSandevistan)) {
+
+        if (game.stage < game.maxStage) {
+
+            if (game.stage === 1 && stageChoice.style.display !== "flex") {
+
+                game.stageComplete = true;
+
+                stageChoice.style.display = "flex";
+
+                showMessage("STAGE CLEAR // SELECT YOUR NEXT MISSION");
+
+            }
+
+        } else {
+
+            game.victory = true;
+
+            showMessage("CASE CLOSED // CITY SECURED");
+
+        }
+
+    }
+
+    if (player.hp <= 0) {
+
+        player.hp = 100;
+
+        setupStage(game.stage);
+
+        showMessage("SYSTEM RESTORED // TRY AGAIN");
+
+    }
+
+}
 
 
 /* =================================================
@@ -790,6 +1318,16 @@ function verticalCollision() {
 ================================================= */
 
 function updatePlayer() {
+
+
+    if (
+        stageChoice.style.display === "flex" ||
+        game.victory
+    ) {
+
+        return;
+
+    }
 
 
     /*
@@ -1160,7 +1698,6 @@ function drawCity() {
     const buildingWidth =
         120;
 
-
     const startX =
 
         Math.floor(
@@ -1189,13 +1726,13 @@ function drawCity() {
 
         const height =
 
-            180 +
+            300 +
 
             Math.abs(
                 x * 17
             ) %
 
-            280;
+            420;
 
 
         const screenX =
@@ -1564,162 +2101,209 @@ function drawPlayer() {
         camera.y;
 
 
+    if (
+        !playerSprite.complete ||
+        playerSprite.naturalWidth === 0
+    ) {
+
+        return;
+
+    }
+
+
+    const isWalking =
+        player.grounded &&
+        player.velocityX !== 0;
+
+
+    const row =
+        player.grounded
+        ?
+        (isWalking
+            ? spriteSheet.walkRow
+            : spriteSheet.idleRow)
+        :
+        spriteSheet.jumpRow;
+
+
+    const animationSpeed =
+        player.grounded
+        ?
+        (isWalking
+            ? spriteSheet.walkSpeed
+            : spriteSheet.idleSpeed)
+        :
+        spriteSheet.jumpSpeed;
+
+
+    const frame =
+        Math.floor(
+            performance.now() /
+            animationSpeed
+        ) %
+        spriteSheet.columns;
+
+
+    const frameWidth =
+        playerSprite.naturalWidth /
+        spriteSheet.columns;
+
+
+    const frameHeight =
+        spriteSheet.frameHeight;
+
+
     ctx.save();
 
 
-    /*
-     * Character glow
-     */
-
     ctx.shadowBlur =
-        20;
+        14;
 
     ctx.shadowColor =
         "#ff00ff";
 
 
-    /*
-     * BODY
-     */
+    ctx.translate(
+        x + 22,
+        0
+    );
 
-    ctx.fillStyle =
-        "#0055ff";
-
-
-    ctx.fillRect(
-
-        x + 8,
-
-        y + 25,
-
-        28,
-
-        25
-
+    ctx.scale(
+        player.direction,
+        1
     );
 
 
-    /*
-     * HEAD
-     */
-
-    ctx.fillStyle =
-        "#d58a6a";
-
-
-    ctx.fillRect(
-
-        x + 7,
-
-        y + 2,
-
-        30,
-
-        25
-
+    ctx.drawImage(
+        playerSprite,
+        frame * frameWidth,
+        row * frameHeight,
+        frameWidth,
+        frameHeight,
+        -22,
+        y - 1,
+        44,
+        61
     );
 
 
-    /*
-     * HAIR
-     */
+    ctx.restore();
 
-    ctx.fillStyle =
-        "#111111";
+}
 
 
-    ctx.fillRect(
+function drawGameplayObjects() {
 
-        x + 5,
+    const finishScreenX = game.finishX - camera.x;
 
-        y,
+    ctx.save();
 
-        34,
+    ctx.strokeStyle = game.stageComplete ? "#00ff99" : "#ff0055";
 
-        10
+    ctx.shadowBlur = 18;
 
-    );
+    ctx.shadowColor = ctx.strokeStyle;
 
+    ctx.strokeRect(finishScreenX, world.groundY - 130 - camera.y, 70, 130);
 
-    /*
-     * CYBER IMPLANT
-     */
+    ctx.fillStyle = ctx.strokeStyle;
 
-    ctx.fillStyle =
-        "#00ffff";
+    ctx.font = "12px Courier New";
 
+    ctx.fillText("EXIT", finishScreenX + 18, world.groundY - 142 - camera.y);
 
-    ctx.fillRect(
+    for (const item of pickups) {
 
-        x + 8,
+        if (item.collected) continue;
 
-        y + 12,
+        const x = item.x - camera.x;
+        const y = item.y - camera.y;
 
-        5,
+        ctx.fillStyle = item.type === "gun" ? "#ffe600" : "#00ffff";
 
-        5
+        ctx.shadowColor = ctx.fillStyle;
 
-    );
+        ctx.shadowBlur = 15;
 
+        ctx.fillRect(x, y, 34, 20);
 
-    /*
-     * LEGS
-     */
+        ctx.fillStyle = "#05000d";
 
-    ctx.fillStyle =
-        "#ff00aa";
+        ctx.font = "9px Courier New";
 
+        ctx.fillText(item.type === "gun" ? "PISTOL" : "SVD", x + 3, y + 14);
 
-    ctx.fillRect(
+    }
 
-        x + 9,
+    for (const bullet of bullets) {
 
-        y + 48,
+        ctx.fillStyle = "#ffe600";
 
-        9,
+        ctx.shadowColor = "#ffe600";
 
-        12
+        ctx.shadowBlur = 12;
 
-    );
+        ctx.fillRect(bullet.x - camera.x, bullet.y - camera.y, bullet.width, bullet.height);
 
+    }
 
-    ctx.fillRect(
+    for (const enemy of enemies) {
 
-        x + 25,
+        if (enemy.dead) continue;
 
-        y + 48,
+        const x = enemy.x - camera.x;
+        const y = enemy.y - camera.y;
+        const isBoss = enemy.type === "boss" || enemy.type === "miniBoss";
 
-        9,
+        ctx.fillStyle = isBoss ? "#ff0055" : "#ff7a00";
 
-        12
+        ctx.shadowColor = ctx.fillStyle;
 
-    );
+        ctx.shadowBlur = isBoss ? 24 : 12;
 
+        ctx.fillRect(x + 5, y + 12, enemy.width - 10, enemy.height - 12);
 
-    /*
-     * ENERGY CORE
-     */
+        ctx.fillStyle = "#00ffff";
 
-    ctx.fillStyle =
-        "#00ffff";
+        ctx.fillRect(x + 10, y + 20, enemy.width - 20, 8);
 
+        ctx.fillStyle = "#190020";
 
-    ctx.shadowBlur =
-        15;
+        ctx.fillRect(x, y - 10, enemy.width, 5);
 
+        ctx.fillStyle = "#00ff99";
 
-    ctx.fillRect(
+        ctx.fillRect(x, y - 10, enemy.width * enemy.hp / enemy.maxHp, 5);
 
-        x + 18,
+        if (isBoss) {
 
-        y + 32,
+            ctx.fillStyle = "#ffffff";
 
-        7,
+            ctx.font = "11px Courier New";
 
-        7
+            ctx.fillText(enemy.type === "boss" ? "BOSS" : "MINI-BOSS", x - 3, y - 18);
 
-    );
+        }
 
+    }
+
+    if (game.slowTime > 0) {
+
+        ctx.fillStyle = "rgba(0, 255, 255, .08)";
+
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    }
+
+    if (performance.now() < game.messageUntil) {
+
+        ctx.fillStyle = "#ffffff";
+
+        ctx.font = "16px Courier New";
+
+        ctx.fillText(game.message, 30, canvas.height - 30);
+
+    }
 
     ctx.restore();
 
@@ -1754,6 +2338,34 @@ function updateHUD() {
         :
         "NO";
 
+    document.getElementById(
+        "stage"
+    ).innerText =
+        String(game.stage).padStart(2, "0") +
+        " / " +
+        String(game.maxStage).padStart(2, "0");
+
+    const bossAlive = enemies.some(enemy => !enemy.dead && (enemy.type === "boss" || enemy.type === "miniBoss"));
+
+    document.getElementById(
+        "objective"
+    ).innerText =
+        game.victory
+        ? "CASE CLOSED"
+        : bossAlive
+            ? "DEFEAT BOSS"
+            : game.stage === 2 && !game.hasSandevistan
+                ? "FIND SVD"
+                : "REACH EXIT";
+
+    document.getElementById(
+        "hp"
+    ).style.width = player.hp + "%";
+
+    document.getElementById(
+        "energy"
+    ).style.width = game.slowTime > 0 ? "35%" : "100%";
+
 }
 
 
@@ -1765,6 +2377,8 @@ function gameLoop() {
 
 
     updatePlayer();
+
+    updateGameplay(16.67);
 
     updateCamera();
 
@@ -1788,6 +2402,8 @@ function gameLoop() {
 
     drawMap();
 
+    drawGameplayObjects();
+
     drawPlayer();
 
 
@@ -1799,6 +2415,9 @@ function gameLoop() {
     );
 
 }
+
+
+setupStage(game.stage);
 
 
 gameLoop();
