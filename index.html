@@ -1,0 +1,1810 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0">
+
+    <title>Cyberpunk RPG - Platform System</title>
+
+    <style>
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+
+            width: 100%;
+            height: 100%;
+
+            overflow: hidden;
+
+            background: #05000d;
+
+            font-family:
+                "Courier New",
+                monospace;
+
+        }
+
+        canvas {
+
+            display: block;
+
+            width: 100%;
+            height: 100%;
+
+        }
+
+
+        /* =========================================
+           HUD
+        ========================================= */
+
+        #hud {
+
+            position: fixed;
+
+            top: 20px;
+            left: 20px;
+
+            width: 290px;
+
+            padding: 16px;
+
+            background:
+                rgba(5, 0, 20, .88);
+
+            border:
+                1px solid #00ffff;
+
+            box-shadow:
+                0 0 15px #00ffff;
+
+            color: white;
+
+            z-index: 10;
+
+        }
+
+
+        .title {
+
+            color: #00ffff;
+
+            font-size: 20px;
+
+            font-weight: bold;
+
+            text-shadow:
+                0 0 10px #00ffff;
+
+            margin-bottom: 10px;
+
+        }
+
+
+        .stat {
+
+            margin-top: 8px;
+
+            font-size: 13px;
+
+        }
+
+
+        .bar {
+
+            width: 100%;
+
+            height: 8px;
+
+            background:
+                #190020;
+
+            margin-top: 5px;
+
+            border:
+                1px solid #7000ff;
+
+        }
+
+
+        #hp {
+
+            width: 100%;
+
+            height: 100%;
+
+            background:
+                #ff0055;
+
+            box-shadow:
+                0 0 10px #ff0055;
+
+        }
+
+
+        #energy {
+
+            width: 100%;
+
+            height: 100%;
+
+            background:
+                #00ffff;
+
+            box-shadow:
+                0 0 10px #00ffff;
+
+        }
+
+
+        /* =========================================
+           CONTROLS
+        ========================================= */
+
+        #controls {
+
+            position: fixed;
+
+            right: 20px;
+            bottom: 20px;
+
+            padding: 15px;
+
+            background:
+                rgba(5, 0, 20, .88);
+
+            border:
+                1px solid #ff00ff;
+
+            box-shadow:
+                0 0 15px #ff00ff;
+
+            color: #ddd;
+
+            font-size: 12px;
+
+            z-index: 10;
+
+        }
+
+
+        /* =========================================
+           MAP INFO
+        ========================================= */
+
+        #mapInfo {
+
+            position: fixed;
+
+            top: 20px;
+
+            right: 20px;
+
+            padding: 12px 16px;
+
+            background:
+                rgba(5, 0, 20, .88);
+
+            border:
+                1px solid #ff00ff;
+
+            box-shadow:
+                0 0 15px #ff00ff;
+
+            color: #ff00ff;
+
+            z-index: 10;
+
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+
+<!-- =============================================
+     HUD
+============================================= -->
+
+<div id="hud">
+
+    <div class="title">
+        ⚡ CYBER RPG
+    </div>
+
+    <div>
+        PLAYER // V-01
+    </div>
+
+    <div class="stat">
+
+        LEVEL:
+        <span id="level">
+            01
+        </span>
+
+    </div>
+
+    <div class="stat">
+
+        HP
+
+        <div class="bar">
+
+            <div id="hp"></div>
+
+        </div>
+
+    </div>
+
+    <div class="stat">
+
+        ENERGY
+
+        <div class="bar">
+
+            <div id="energy"></div>
+
+        </div>
+
+    </div>
+
+    <div class="stat">
+
+        POSITION:
+
+        <span id="position">
+            0, 0
+        </span>
+
+    </div>
+
+    <div class="stat">
+
+        GROUNDED:
+
+        <span id="grounded">
+            NO
+        </span>
+
+    </div>
+
+</div>
+
+
+<!-- =============================================
+     MAP INFO
+============================================= -->
+
+<div id="mapInfo">
+
+    🌃 NEON DISTRICT // SECTOR 01
+
+</div>
+
+
+<!-- =============================================
+     CONTROLS
+============================================= -->
+
+<div id="controls">
+
+    <b>CONTROLS</b>
+
+    <br><br>
+
+    A / ← &nbsp; MOVE LEFT
+
+    <br>
+
+    D / → &nbsp; MOVE RIGHT
+
+    <br>
+
+    W / ↑ / SPACE &nbsp; JUMP
+
+    <br><br>
+
+    🟦 SOLID BLOCK
+
+    <br>
+
+    🟪 PLATFORM
+
+</div>
+
+
+<canvas id="gameCanvas"></canvas>
+
+
+<script>
+
+/* =================================================
+   CANVAS
+================================================= */
+
+const canvas =
+    document.getElementById(
+        "gameCanvas"
+    );
+
+const ctx =
+    canvas.getContext("2d");
+
+
+function resizeCanvas() {
+
+    canvas.width =
+        window.innerWidth;
+
+    canvas.height =
+        window.innerHeight;
+
+}
+
+
+resizeCanvas();
+
+
+window.addEventListener(
+    "resize",
+    resizeCanvas
+);
+
+
+/* =================================================
+   KEYBOARD
+================================================= */
+
+const keys = {};
+
+
+window.addEventListener(
+    "keydown",
+    function(event) {
+
+        keys[event.key] = true;
+
+
+        if (
+
+            event.key === "ArrowUp" ||
+            event.key === "ArrowDown" ||
+            event.key === "ArrowLeft" ||
+            event.key === "ArrowRight" ||
+            event.key === " "
+
+        ) {
+
+            event.preventDefault();
+
+        }
+
+    }
+);
+
+
+window.addEventListener(
+    "keyup",
+    function(event) {
+
+        keys[event.key] = false;
+
+    }
+);
+
+
+/* =================================================
+   WORLD
+================================================= */
+
+const TILE = 50;
+
+
+const world = {
+
+    width: 5000,
+
+    height: 2000,
+
+    gravity: 0.7
+
+};
+
+
+/* =================================================
+   PLAYER
+================================================= */
+
+const player = {
+
+    x: 300,
+
+    y: 300,
+
+    width: 42,
+
+    height: 60,
+
+    velocityX: 0,
+
+    velocityY: 0,
+
+    speed: 6,
+
+    jumpPower: 15,
+
+    grounded: false,
+
+    direction: 1,
+
+    hp: 100,
+
+    energy: 100,
+
+    level: 1
+
+};
+
+
+/* =================================================
+   MAP
+=================================================
+
+   type:
+
+   solid
+   = block that cannot be passed
+
+   platform
+   = can jump through from below
+
+================================================= */
+
+const map = [
+
+    /*
+     * GROUND
+     */
+
+    {
+        x: 0,
+        y: 650,
+        width: 5000,
+        height: 200,
+        type: "solid"
+    },
+
+
+    /*
+     * PLATFORM 1
+     */
+
+    {
+        x: 500,
+        y: 500,
+        width: 250,
+        height: 30,
+        type: "platform"
+    },
+
+
+    /*
+     * PLATFORM 2
+     */
+
+    {
+        x: 900,
+        y: 400,
+        width: 250,
+        height: 30,
+        type: "platform"
+    },
+
+
+    /*
+     * PLATFORM 3
+     */
+
+    {
+        x: 1300,
+        y: 520,
+        width: 300,
+        height: 30,
+        type: "platform"
+    },
+
+
+    /*
+     * BUILDING
+     */
+
+    {
+        x: 1750,
+        y: 400,
+        width: 250,
+        height: 250,
+        type: "solid"
+    },
+
+
+    /*
+     * HIGH PLATFORM
+     */
+
+    {
+        x: 2100,
+        y: 350,
+        width: 300,
+        height: 30,
+        type: "platform"
+    },
+
+
+    /*
+     * BUILDING 2
+     */
+
+    {
+        x: 2600,
+        y: 300,
+        width: 250,
+        height: 350,
+        type: "solid"
+    },
+
+
+    /*
+     * PLATFORM 4
+     */
+
+    {
+        x: 3000,
+        y: 450,
+        width: 300,
+        height: 30,
+        type: "platform"
+    },
+
+
+    /*
+     * PLATFORM 5
+     */
+
+    {
+        x: 3500,
+        y: 350,
+        width: 350,
+        height: 30,
+        type: "platform"
+    },
+
+
+    /*
+     * BUILDING 3
+     */
+
+    {
+        x: 4100,
+        y: 250,
+        width: 300,
+        height: 400,
+        type: "solid"
+    }
+
+];
+
+
+/* =================================================
+   COLLISION CHECK
+================================================= */
+
+function isColliding(a, b) {
+
+    return (
+
+        a.x <
+        b.x + b.width
+
+        &&
+
+        a.x + a.width >
+        b.x
+
+        &&
+
+        a.y <
+        b.y + b.height
+
+        &&
+
+        a.y + a.height >
+        b.y
+
+    );
+
+}
+
+
+/* =================================================
+   HORIZONTAL COLLISION
+================================================= */
+
+function horizontalCollision() {
+
+    for (
+        const block of map
+    ) {
+
+        if (
+            block.type !== "solid"
+        ) {
+
+            continue;
+
+        }
+
+
+        if (
+            !isColliding(
+                player,
+                block
+            )
+        ) {
+
+            continue;
+
+        }
+
+
+        /*
+         * Moving RIGHT
+         */
+
+        if (
+            player.velocityX > 0
+        ) {
+
+            player.x =
+                block.x -
+                player.width;
+
+        }
+
+
+        /*
+         * Moving LEFT
+         */
+
+        if (
+            player.velocityX < 0
+        ) {
+
+            player.x =
+                block.x +
+                block.width;
+
+        }
+
+    }
+
+}
+
+
+/* =================================================
+   VERTICAL COLLISION
+================================================= */
+
+function verticalCollision() {
+
+    player.grounded = false;
+
+
+    for (
+        const block of map
+    ) {
+
+        if (
+            !isColliding(
+                player,
+                block
+            )
+        ) {
+
+            continue;
+
+        }
+
+
+        /*
+         * LANDING ON BLOCK
+         */
+
+        if (
+            player.velocityY >= 0 &&
+
+            player.y +
+            player.height
+            <=
+            block.y +
+            20
+        ) {
+
+            player.y =
+                block.y -
+                player.height;
+
+            player.velocityY =
+                0;
+
+            player.grounded =
+                true;
+
+        }
+
+
+        /*
+         * HIT CEILING
+         */
+
+        else if (
+            player.velocityY < 0 &&
+
+            player.y
+            >=
+            block.y +
+            block.height -
+            20
+        ) {
+
+            player.y =
+                block.y +
+                block.height;
+
+            player.velocityY =
+                0;
+
+        }
+
+    }
+
+}
+
+
+/* =================================================
+   UPDATE PLAYER
+================================================= */
+
+function updatePlayer() {
+
+
+    /*
+     * RESET HORIZONTAL VELOCITY
+     */
+
+    player.velocityX = 0;
+
+
+    /*
+     * LEFT
+     */
+
+    if (
+
+        keys["a"] ||
+        keys["A"] ||
+        keys["ArrowLeft"]
+
+    ) {
+
+        player.velocityX =
+            -player.speed;
+
+        player.direction =
+            -1;
+
+    }
+
+
+    /*
+     * RIGHT
+     */
+
+    if (
+
+        keys["d"] ||
+        keys["D"] ||
+        keys["ArrowRight"]
+
+    ) {
+
+        player.velocityX =
+            player.speed;
+
+        player.direction =
+            1;
+
+    }
+
+
+    /*
+     * HORIZONTAL MOVEMENT
+     */
+
+    player.x +=
+        player.velocityX;
+
+
+    /*
+     * COLLISION X
+     */
+
+    horizontalCollision();
+
+
+    /*
+     * JUMP
+     */
+
+    if (
+
+        (
+            keys["w"] ||
+            keys["W"] ||
+            keys["ArrowUp"] ||
+            keys[" "]
+        )
+
+        &&
+
+        player.grounded
+
+    ) {
+
+        player.velocityY =
+            -player.jumpPower;
+
+        player.grounded =
+            false;
+
+    }
+
+
+    /*
+     * GRAVITY
+     */
+
+    player.velocityY +=
+        world.gravity;
+
+
+    /*
+     * VERTICAL MOVEMENT
+     */
+
+    player.y +=
+        player.velocityY;
+
+
+    /*
+     * COLLISION Y
+     */
+
+    verticalCollision();
+
+
+    /*
+     * WORLD BOUNDARY
+     */
+
+    if (
+        player.x < 0
+    ) {
+
+        player.x = 0;
+
+    }
+
+
+    if (
+        player.x +
+        player.width >
+        world.width
+    ) {
+
+        player.x =
+            world.width -
+            player.width;
+
+    }
+
+}
+
+
+/* =================================================
+   CAMERA
+================================================= */
+
+const camera = {
+
+    x: 0,
+
+    y: 0,
+
+    smoothness: 0.08
+
+};
+
+
+function updateCamera() {
+
+
+    const targetX =
+
+        player.x -
+        canvas.width / 2 +
+        player.width / 2;
+
+
+    const targetY =
+
+        player.y -
+        canvas.height / 2 +
+        player.height / 2;
+
+
+    camera.x +=
+
+        (
+            targetX -
+            camera.x
+        )
+
+        *
+
+        camera.smoothness;
+
+
+    camera.y +=
+
+        (
+            targetY -
+            camera.y
+        )
+
+        *
+
+        camera.smoothness;
+
+
+    /*
+     * Camera X boundaries
+     */
+
+    camera.x =
+        Math.max(
+            0,
+            camera.x
+        );
+
+
+    camera.x =
+        Math.min(
+            world.width -
+            canvas.width,
+
+            camera.x
+        );
+
+
+    /*
+     * Camera Y boundaries
+     */
+
+    camera.y =
+        Math.max(
+            0,
+            camera.y
+        );
+
+
+    camera.y =
+        Math.min(
+            world.height -
+            canvas.height,
+
+            camera.y
+        );
+
+}
+
+
+/* =================================================
+   BACKGROUND
+================================================= */
+
+function drawBackground() {
+
+
+    const gradient =
+        ctx.createLinearGradient(
+            0,
+            0,
+            0,
+            canvas.height
+        );
+
+
+    gradient.addColorStop(
+        0,
+        "#020008"
+    );
+
+
+    gradient.addColorStop(
+        .5,
+        "#12002b"
+    );
+
+
+    gradient.addColorStop(
+        1,
+        "#05000d"
+    );
+
+
+    ctx.fillStyle =
+        gradient;
+
+
+    ctx.fillRect(
+        0,
+        0,
+        canvas.width,
+        canvas.height
+    );
+
+
+    /*
+     * MOON
+     */
+
+    ctx.beginPath();
+
+    ctx.arc(
+        canvas.width - 180,
+        120,
+        60,
+        0,
+        Math.PI * 2
+    );
+
+    ctx.fillStyle =
+        "#8f00ff";
+
+    ctx.shadowBlur =
+        40;
+
+    ctx.shadowColor =
+        "#8f00ff";
+
+    ctx.fill();
+
+    ctx.shadowBlur =
+        0;
+
+
+    /*
+     * STARS
+     */
+
+    for (
+        let i = 0;
+        i < 100;
+        i++
+    ) {
+
+        const x =
+            (
+                i * 137
+            ) %
+
+            canvas.width;
+
+
+        const y =
+            (
+                i * 73
+            ) %
+
+            450;
+
+
+        ctx.fillStyle =
+            "#00ffff";
+
+
+        ctx.fillRect(
+            x,
+            y,
+            2,
+            2
+        );
+
+    }
+
+}
+
+
+/* =================================================
+   CITY
+================================================= */
+
+function drawCity() {
+
+
+    const buildingWidth =
+        120;
+
+
+    const startX =
+
+        Math.floor(
+            camera.x /
+            buildingWidth
+        )
+        *
+        buildingWidth;
+
+
+    for (
+
+        let x =
+            startX - 300;
+
+        x <
+            camera.x +
+            canvas.width +
+            300;
+
+        x +=
+            buildingWidth
+
+    ) {
+
+
+        const height =
+
+            180 +
+
+            Math.abs(
+                x * 17
+            ) %
+
+            280;
+
+
+        const screenX =
+            x -
+            camera.x;
+
+
+        const screenY =
+            world.groundY -
+            height;
+
+
+        /*
+         * Building
+         */
+
+        ctx.fillStyle =
+            "#090015";
+
+
+        ctx.strokeStyle =
+            "#7000ff";
+
+
+        ctx.lineWidth =
+            2;
+
+
+        ctx.shadowBlur =
+            12;
+
+
+        ctx.shadowColor =
+            "#7000ff";
+
+
+        ctx.fillRect(
+
+            screenX,
+
+            screenY,
+
+            buildingWidth - 10,
+
+            height
+
+        );
+
+
+        ctx.strokeRect(
+
+            screenX,
+
+            screenY,
+
+            buildingWidth - 10,
+
+            height
+
+        );
+
+
+        ctx.shadowBlur =
+            0;
+
+
+        /*
+         * Windows
+         */
+
+        for (
+
+            let y =
+                screenY + 20;
+
+            y <
+                world.groundY - 20;
+
+            y += 35
+
+        ) {
+
+
+            ctx.fillStyle =
+                "#00ffff";
+
+
+            ctx.shadowBlur =
+                8;
+
+
+            ctx.shadowColor =
+                "#00ffff";
+
+
+            ctx.fillRect(
+
+                screenX + 15,
+
+                y,
+
+                12,
+
+                16
+
+            );
+
+
+            ctx.fillRect(
+
+                screenX + 55,
+
+                y,
+
+                12,
+
+                16
+
+            );
+
+
+            ctx.shadowBlur =
+                0;
+
+        }
+
+    }
+
+}
+
+
+/* =================================================
+   DRAW MAP
+================================================= */
+
+function drawMap() {
+
+
+    for (
+        const block of map
+    ) {
+
+
+        const x =
+            block.x -
+            camera.x;
+
+
+        const y =
+            block.y -
+            camera.y;
+
+
+        /*
+         * PLATFORM
+         */
+
+        if (
+            block.type ===
+            "platform"
+        ) {
+
+            ctx.fillStyle =
+                "#180025";
+
+
+            ctx.strokeStyle =
+                "#ff00ff";
+
+
+            ctx.lineWidth =
+                3;
+
+
+            ctx.shadowBlur =
+                15;
+
+
+            ctx.shadowColor =
+                "#ff00ff";
+
+
+            ctx.fillRect(
+
+                x,
+
+                y,
+
+                block.width,
+
+                block.height
+
+            );
+
+
+            ctx.strokeRect(
+
+                x,
+
+                y,
+
+                block.width,
+
+                block.height
+
+            );
+
+
+            ctx.shadowBlur =
+                0;
+
+        }
+
+
+        /*
+         * SOLID BLOCK
+         */
+
+        if (
+            block.type ===
+            "solid"
+        ) {
+
+            ctx.fillStyle =
+                "#080010";
+
+
+            ctx.strokeStyle =
+                "#00ffff";
+
+
+            ctx.lineWidth =
+                2;
+
+
+            ctx.shadowBlur =
+                10;
+
+
+            ctx.shadowColor =
+                "#00ffff";
+
+
+            ctx.fillRect(
+
+                x,
+
+                y,
+
+                block.width,
+
+                block.height
+
+            );
+
+
+            ctx.strokeRect(
+
+                x,
+
+                y,
+
+                block.width,
+
+                block.height
+
+            );
+
+
+            ctx.shadowBlur =
+                0;
+
+
+            /*
+             * Grid
+             */
+
+            ctx.strokeStyle =
+                "rgba(0,255,255,.12)";
+
+
+            for (
+
+                let gx =
+                    x;
+
+                gx <
+                    x +
+                    block.width;
+
+                gx +=
+                    TILE
+
+            ) {
+
+                ctx.beginPath();
+
+                ctx.moveTo(
+                    gx,
+                    y
+                );
+
+                ctx.lineTo(
+                    gx,
+                    y +
+                    block.height
+                );
+
+                ctx.stroke();
+
+            }
+
+
+            for (
+
+                let gy =
+                    y;
+
+                gy <
+                    y +
+                    block.height;
+
+                gy +=
+                    TILE
+
+            ) {
+
+                ctx.beginPath();
+
+                ctx.moveTo(
+                    x,
+                    gy
+                );
+
+                ctx.lineTo(
+                    x +
+                    block.width,
+                    gy
+                );
+
+                ctx.stroke();
+
+            }
+
+        }
+
+    }
+
+}
+
+
+/* =================================================
+   DRAW PLAYER
+================================================= */
+
+function drawPlayer() {
+
+
+    const x =
+        player.x -
+        camera.x;
+
+
+    const y =
+        player.y -
+        camera.y;
+
+
+    ctx.save();
+
+
+    /*
+     * Character glow
+     */
+
+    ctx.shadowBlur =
+        20;
+
+    ctx.shadowColor =
+        "#ff00ff";
+
+
+    /*
+     * BODY
+     */
+
+    ctx.fillStyle =
+        "#0055ff";
+
+
+    ctx.fillRect(
+
+        x + 8,
+
+        y + 25,
+
+        28,
+
+        25
+
+    );
+
+
+    /*
+     * HEAD
+     */
+
+    ctx.fillStyle =
+        "#d58a6a";
+
+
+    ctx.fillRect(
+
+        x + 7,
+
+        y + 2,
+
+        30,
+
+        25
+
+    );
+
+
+    /*
+     * HAIR
+     */
+
+    ctx.fillStyle =
+        "#111111";
+
+
+    ctx.fillRect(
+
+        x + 5,
+
+        y,
+
+        34,
+
+        10
+
+    );
+
+
+    /*
+     * CYBER IMPLANT
+     */
+
+    ctx.fillStyle =
+        "#00ffff";
+
+
+    ctx.fillRect(
+
+        x + 8,
+
+        y + 12,
+
+        5,
+
+        5
+
+    );
+
+
+    /*
+     * LEGS
+     */
+
+    ctx.fillStyle =
+        "#ff00aa";
+
+
+    ctx.fillRect(
+
+        x + 9,
+
+        y + 48,
+
+        9,
+
+        12
+
+    );
+
+
+    ctx.fillRect(
+
+        x + 25,
+
+        y + 48,
+
+        9,
+
+        12
+
+    );
+
+
+    /*
+     * ENERGY CORE
+     */
+
+    ctx.fillStyle =
+        "#00ffff";
+
+
+    ctx.shadowBlur =
+        15;
+
+
+    ctx.fillRect(
+
+        x + 18,
+
+        y + 32,
+
+        7,
+
+        7
+
+    );
+
+
+    ctx.restore();
+
+}
+
+
+/* =================================================
+   HUD
+================================================= */
+
+function updateHUD() {
+
+
+    document.getElementById(
+        "position"
+    ).innerText =
+
+        Math.floor(player.x)
+        +
+        ", "
+        +
+        Math.floor(player.y);
+
+
+    document.getElementById(
+        "grounded"
+    ).innerText =
+
+        player.grounded
+        ?
+        "YES"
+        :
+        "NO";
+
+}
+
+
+/* =================================================
+   GAME LOOP
+================================================= */
+
+function gameLoop() {
+
+
+    updatePlayer();
+
+    updateCamera();
+
+
+    ctx.clearRect(
+
+        0,
+
+        0,
+
+        canvas.width,
+
+        canvas.height
+
+    );
+
+
+    drawBackground();
+
+    drawCity();
+
+    drawMap();
+
+    drawPlayer();
+
+
+    updateHUD();
+
+
+    requestAnimationFrame(
+        gameLoop
+    );
+
+}
+
+
+gameLoop();
+
+</script>
+
+</body>
+
+</html>
